@@ -169,9 +169,6 @@ def GA(file='dis_data.csv'):
     mutate=0.1
     memory={}
 
-    lastb=tuple(set(['cumul_AppRatio',	'cumul_deletedApp',	'CurrPro_avgProbTimeWE',	'OptionalCount',	'difficultProblemCountSolved',	'SolvedPSInLevel',	'probIndexPSinLevel',	'DirectProofActionCount']))
-
-    memory[lastb]=eval(lastb)
 
     ### Initial candidates
     current={}
@@ -199,8 +196,7 @@ def GA(file='dis_data.csv'):
                 new = tuple(set(np.random.choice(parents,fea_num,replace=False)))
             current[new]=eval(new)
         if lastE==len(memory):
-            continue
-            # break
+            break
         lastE=len(memory)
     best=tuple(set(np.array(memory.keys())[np.argsort(memory.values())[::-1][0]]))
     print(best)
