@@ -166,14 +166,19 @@ def GA(file='dis_data.csv'):
     ### GA parameters
     NumG=100
     MaxG=20
-    mutate=0.05
+    mutate=0.1
     memory={}
+
+    lastb=tuple(set(['cumul_AppRatio',	'cumul_deletedApp',	'CurrPro_avgProbTimeWE',	'OptionalCount',	'difficultProblemCountSolved',	'SolvedPSInLevel',	'probIndexPSinLevel',	'DirectProofActionCount']))
+
+    memory[lastb]=eval(lastb)
 
     ### Initial candidates
     current={}
     for i in xrange(NumG):
         x=tuple(set(np.random.choice(features, fea_num, replace=False)))
         current[x]=eval(x)
+    lastE = len(memory)
     ### Generations
     for generation in xrange(MaxG):
         ## selection
@@ -193,6 +198,10 @@ def GA(file='dis_data.csv'):
             else:
                 new = tuple(set(np.random.choice(parents,fea_num,replace=False)))
             current[new]=eval(new)
+        if lastE==len(memory):
+            continue
+            # break
+        lastE=len(memory)
     best=tuple(set(np.array(memory.keys())[np.argsort(memory.values())[::-1][0]]))
     print(best)
     print(memory[best])
