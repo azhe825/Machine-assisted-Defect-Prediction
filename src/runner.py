@@ -575,7 +575,7 @@ def simple(first):
         pickle.dump(result,handle)
 
 
-def START(filename,cl="SVM"):
+def START(filename,cl="SVM-linear"):
     stop=1
 
     read = MAR()
@@ -586,50 +586,11 @@ def START(filename,cl="SVM"):
         print("%d, %d" %(pos,pos+neg))
         if pos >= target:
             break
-        if pos==0:
+        if pos==0 or pos+neg<40:
             for id in read.random():
                 read.code(id, read.body["label"][id])
         else:
             a,b,ids,c =read.train(cl=cl)
-            for id in ids:
-                read.code(id, read.body["label"][id])
-    return read
-
-def TIME(filename,old):
-    stop=0.9
-
-    read = MAR()
-    read = read.create(filename)
-    read.create_old(old)
-    num2 = read.get_allpos()
-    target = int(num2*stop)
-    while True:
-        pos, neg, total = read.get_numbers()
-        # print("%d/ %d" % (pos,pos+neg))
-        if pos >= target:
-            break
-        a,b,ids,c =read.train_kept()
-        for id in ids:
-            read.code(id, read.body["label"][id])
-    return read
-
-def TIME_START(filename):
-    stop=0.9
-
-    read = MAR()
-    read = read.create(filename)
-    num2 = read.get_allpos()
-    target = int(num2*stop)
-    while True:
-        pos, neg, total = read.get_numbers()
-        # print("%d/ %d" % (pos,pos+neg))
-        if pos >= target:
-            break
-        if pos==0:
-            for id in read.random():
-                read.code(id, read.body["label"][id])
-        else:
-            a,b,ids,c =read.train_kept()
             for id in ids:
                 read.code(id, read.body["label"][id])
     return read

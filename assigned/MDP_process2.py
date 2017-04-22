@@ -102,8 +102,16 @@ def output_policy(distinct_acts, distinct_states, vi):
     Ns = len(distinct_states)
     print('Policy: ')
     print('state -> action, value-function')
+    a=0
+    b=0
     for s in range(Ns):
         print(distinct_states[s]+ " -> " + distinct_acts[vi.policy[s]] + ", "+str(vi.V[s]))
+        if distinct_acts[vi.policy[s]]=="PS":
+            a=a+1
+        elif distinct_acts[vi.policy[s]]=="WE":
+            b=b+1
+    print(a)
+    print(b)
 
 def induce_policy_MDP():
 
