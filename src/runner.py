@@ -312,7 +312,114 @@ def draw(file):
         plt.savefig("../figure/"+str(file)+str(i)+".png")
 
 
+def draw_soa(file):
+    font = {'family': 'normal',
+            'weight': 'bold',
+            'size': 20}
 
+
+    plt.rc('font', **font)
+    paras = {'lines.linewidth': 4, 'legend.fontsize': 20, 'axes.labelsize': 30, 'legend.frameon': False,
+             'figure.autolayout': True, 'figure.figsize': (16, 6)}
+    plt.rcParams.update(paras)
+
+    with open("../dump/"+str(file)+".pickle", "r") as f:
+        results=pickle.load(f)
+
+
+    stats=bestNworst(results)
+    colors=['blue','purple','green','brown','red']
+    lines=['-','--','-.',':']
+    five=['best','$Q_1$','median','$Q_3$','worst']
+
+    nums = set([])
+    line=[0,0,0,0,0]
+
+    xmax = stats['LINEAR'][100]['x'][-1]
+    ymax = stats['LINEAR'][100]['pos'][-1]
+    for key in stats:
+        a = key.split("_")[0]
+        try:
+            b = key.split("_")[1]
+        except:
+            b = 0
+        if key=="LOC":
+            continue
+        if key=="CART":
+            continue
+
+        nums = nums | set([b])
+        plt.figure(int(b))
+        for j,ind in enumerate(stats[key]):
+            if ind == 50:
+                plt.plot(np.array(stats[key][ind]['x'])/xmax, np.array(stats[key][ind]['pos'])/ymax,linestyle=lines[line[int(b)]],label=str(a))
+                # plt.plot(stats[key][ind]['x'], stats[key][ind]['pos'],label=str(a))
+        line[int(b)]+=1
+
+    for i in nums:
+        plt.figure(int(i))
+        plt.plot(0.163,0.49,color="black",marker='o')
+        plt.ylabel("Recall")
+        plt.xlabel("Cost")
+        plt.legend(bbox_to_anchor=(0.9, 0.60), loc=1, ncol=1, borderaxespad=0.)
+        plt.savefig("../figure/"+str(file)+str(i)+".eps")
+        plt.savefig("../figure/"+str(file)+str(i)+".png")
+
+
+def draw_trans(file):
+    font = {'family': 'normal',
+            'weight': 'bold',
+            'size': 20}
+
+
+    plt.rc('font', **font)
+    paras = {'lines.linewidth': 4, 'legend.fontsize': 20, 'axes.labelsize': 30, 'legend.frameon': False,
+             'figure.autolayout': True, 'figure.figsize': (16, 6)}
+    plt.rcParams.update(paras)
+
+    with open("../dump/soa_"+str(file)+".pickle", "r") as f:
+        results=pickle.load(f)
+    with open("../dump/trans_"+str(file)+".pickle", "r") as f:
+        results1=pickle.load(f)
+
+
+    stats=bestNworst(results)
+    stats1 = bestNworst(results1)
+    colors=['blue','purple','green','brown','red']
+    lines=['-','--','-.',':']
+    five=['best','$Q_1$','median','$Q_3$','worst']
+
+    nums = set([])
+    line=[0,0,0,0,0]
+
+    xmax = stats['LINEAR'][100]['x'][-1]
+    ymax = stats['LINEAR'][100]['pos'][-1]
+    b=0
+
+    for key in stats:
+        if key=="LOC":
+            continue
+        for j,ind in enumerate(stats[key]):
+            if ind == 50:
+                plt.plot(np.array(stats[key][ind]['x'])/xmax, np.array(stats[key][ind]['pos'])/ymax,linestyle=lines[line[int(b)]],label=str(key))
+                # plt.plot(stats[key][ind]['x'], stats[key][ind]['pos'],label=str(a))
+        line[int(b)]+=1
+    for key in stats1:
+        if key!="RF":
+            continue
+        for j,ind in enumerate(stats1[key]):
+            if ind == 50:
+                plt.plot(np.array(stats1[key][ind]['x'])/xmax, np.array(stats1[key][ind]['pos'])/ymax,linestyle=lines[line[int(b)]],label='trans_'+str(key))
+                # plt.plot(stats[key][ind]['x'], stats[key][ind]['pos'],label=str(a))
+        line[int(b)]+=1
+
+    i=1
+    plt.plot(0.163, 0.49, color="black", marker='o')
+    plt.ylabel("Recall")
+    plt.xlabel("Cost")
+    plt.legend(bbox_to_anchor=(0.9, 0.60), loc=1, ncol=1, borderaxespad=0.)
+    plt.savefig("../figure/trans_"+str(file)+str(i)+".eps")
+    plt.savefig("../figure/trans_"+str(file)+str(i)+".png")
 
 def draw_pre(file,what="c"):
     font = {'family': 'normal',
@@ -352,13 +459,16 @@ def draw_pre(file,what="c"):
         except:
             b = 0
 
+        if a=="LINEAR":
+            continue
+
         if what=="c":
-            if a=="SVM-rbf" or a=="SVM-sigmoid":
+            if a=="SVM-rbf" or a=="SVM-sigmoid" or a=="SVM-poly":
                 continue
             if a=="SVM-linear":
                 a='SVM'
         else:
-            if a!="SVM-rbf" and a!="SVM-sigmoid" and a!="SVM-linear":
+            if a!="SVM-rbf" and a!="SVM-sigmoid" and a!="SVM-linear" and a!="SVM-poly":
                 continue
 
 
@@ -367,8 +477,8 @@ def draw_pre(file,what="c"):
         plt.figure(int(b))
         for j,ind in enumerate(stats[key]):
             if ind == 50:
-                # plt.plot(stats[key][ind]['x'], stats[key][ind]['pos'],linestyle=lines[line[int(b)]],label=str(a))
-                plt.plot(stats[key][ind]['x'], stats[key][ind]['pos'],label=str(a))
+                plt.plot(stats[key][ind]['x'], stats[key][ind]['pos'],linestyle=lines[line[int(b)]],label=str(a))
+                # plt.plot(stats[key][ind]['x'], stats[key][ind]['pos'],label=str(a))
         line[int(b)]+=1
 
     for i in nums:
@@ -559,8 +669,9 @@ def update(first,second,all):
 
 def simple(first):
     first = str(first)
-    repeats=5
-    result={"LINEAR":[],"SVM-linear":[],"LR":[],"RF":[],"CART":[],"SVM-rbf":[],"SVM-sigmoid":[],"SVM-poly":[]}
+    repeats=30
+    # result={"LINEAR":[],"SVM-linear":[],"LR":[],"RF":[],"CART":[],"SVM-rbf":[],"SVM-sigmoid":[],"SVM-poly":[]}
+    result = {"LINEAR": [],  "LR": [], "RF": [], "CART": [], "NB":[]}
 
     for i in xrange(repeats):
 
@@ -574,8 +685,49 @@ def simple(first):
     with open("../dump/"+first.split('.')[0]+".pickle","wb") as handle:
         pickle.dump(result,handle)
 
+def soa(first):
+    first = str(first)
+    repeats=30
+    result={"LINEAR":[],"RF":[],"LOC":[]}
 
-def START(filename,cl="SVM-linear"):
+    for i in xrange(repeats):
+
+        for key in result:
+            if key=="LOC":
+                a = LOC(first)
+                result[key].append(a.record)
+                a.restart()
+            else:
+                a = START(first,cl=key)
+                result[key].append(a.record)
+                a.restart()
+
+        print("Repeat #{id} finished\r".format(id=i), end="")
+        print(i, end=" ")
+    with open("../dump/soa_"+first.split('.')[0]+".pickle","wb") as handle:
+        pickle.dump(result,handle)
+
+def transfer(first,second):
+    first = str(first)
+    second = str(second)
+
+    repeats=30
+    result={"RF":[],"LR":[]}
+
+    for i in xrange(repeats):
+
+        for key in result:
+            a = UPDATE(first,second,pne=False,cl=key)
+            result[key].append(a.record)
+            a.restart()
+
+        print("Repeat #{id} finished\r".format(id=i), end="")
+        print(i, end=" ")
+    with open("../dump/trans_"+first.split('.')[0]+".pickle","wb") as handle:
+        pickle.dump(result,handle)
+
+
+def START(filename,cl="RF"):
     stop=1
 
     read = MAR()
@@ -595,8 +747,43 @@ def START(filename,cl="SVM-linear"):
                 read.code(id, read.body["label"][id])
     return read
 
-def UPDATE(filename,old,pne=False):
-    stop=0.9
+def START_LOC(filename,cl="SVM-linear"):
+    stop=1
+
+    read = MAR()
+    read = read.create(filename)
+    target = int(read.get_allpos()*stop)
+    while True:
+        pos, neg, total = read.get_numbers()
+        print("%d, %d" %(pos,pos+neg))
+        if pos >= target:
+            break
+        if pos==0 or pos+neg<40:
+            for id in read.loc_sort():
+                read.code(id, read.body["label"][id])
+        else:
+            a,b,ids,c =read.train(cl=cl)
+            for id in ids:
+                read.code(id, read.body["label"][id])
+    return read
+
+def LOC(filename):
+    stop=1
+
+    read = MAR()
+    read = read.create(filename)
+    target = int(read.get_allpos()*stop)
+    while True:
+        pos, neg, total = read.get_numbers()
+        print("%d, %d" %(pos,pos+neg))
+        if pos >= target:
+            break
+        for id in read.loc_sort():
+            read.code(id, read.body["label"][id])
+    return read
+
+def UPDATE(filename,old,pne=False,cl="RF"):
+    stop=1
 
     read = MAR()
     read = read.create(filename)
@@ -605,10 +792,10 @@ def UPDATE(filename,old,pne=False):
     target = int(num2*stop)
     while True:
         pos, neg, total = read.get_numbers()
-        # print("%d/ %d" % (pos,pos+neg))
+        print("%d/ %d" % (pos,pos+neg))
         if pos >= target:
             break
-        a,b,ids,c =read.train(pne)
+        a,b,ids,c =read.train(pne=pne,cl=cl)
         for id in ids:
             read.code(id, read.body["label"][id])
     return read

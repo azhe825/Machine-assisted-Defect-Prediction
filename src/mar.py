@@ -52,25 +52,15 @@ class MAR(object):
     def create_old(self, filename):
         with open("../workspace/coded/" + str(filename), "r") as csvfile:
             content = [x for x in csv.reader(csvfile, delimiter=',')]
-        fields = ["Document Title", "Abstract", "Year", "PDF Link", "code", "time"]
-        header = content[0]
-        ind0 = header.index("code")
-        self.last_pos = len([c[ind0] for c in content[1:] if c[ind0] == "yes"])
-        self.last_neg = len([c[ind0] for c in content[1:] if c[ind0] == "no"])
-        for field in fields:
-            ind = header.index(field)
-            if field == "time":
-                self.body[field].extend([float(c[ind]) for c in content[1:] if c[ind0] != "undetermined"])
-            else:
-                self.body[field].extend([c[ind] for c in content[1:] if c[ind0] != "undetermined"])
-        try:
-            ind = header.index("label")
-            self.body["label"].extend([c[ind] for c in content[1:] if c[ind0]!="undetermined"])
-        except:
-            self.body["label"].extend(["unknown"] * (len([c[ind0] for c in content[1:] if c[ind0]!="undetermined"])))
+        for c in content[1:]:
+            self.body["body"].append(c[:-2])
+            self.body["time"].append(c[-1])
+            self.body["code"].append(c[-2])
 
-        self.preprocess()
-        self.save()
+        self.csr_mat=np.array(self.body["body"])[:,3:-1].astype(float)
+        self.body["label"]=['no' if x[-1]=='0' else 'yes' for x in self.body["body"]]
+        self.last_pos=Counter(self.body["code"])["yes"]
+        self.last_neg = Counter(self.body["code"])["no"]
 
 
     def loadfile(self):
@@ -153,7 +143,7 @@ class MAR(object):
             pass
 
     ## Train model ##
-    def train(self,pne=False,cl="SVM"):
+    def train(self,pne=False,cl="SVM-linear"):
 
 
         if cl.split('-')[0]=='SVM':
@@ -167,6 +157,9 @@ class MAR(object):
         elif cl=="LR":
             from sklearn.linear_model import LogisticRegression
             clf = LogisticRegression()
+        elif cl=="NB":
+            from sklearn.naive_bayes import GaussianNB
+            clf = GaussianNB()
         else:
             return [],[],self.random(),[]
 
@@ -187,7 +180,6 @@ class MAR(object):
         labels=np.array([x if x!='undetermined' else 'no' for x in self.body['code']])
         all_neg=list(negs)+list(unlabeled)
         all = list(decayed)+list(unlabeled)
-
         clf.fit(self.csr_mat[all], labels[all])
         ## aggressive undersampling ##
         if len(poses)>=self.enough and len(negs)>5*len(poses):
@@ -196,7 +188,6 @@ class MAR(object):
             negs_sel = np.argsort(train_prob)[:len(left)]
             sample = list(left) + list(np.array(all_neg)[negs_sel])
             clf.fit(self.csr_mat[sample], labels[sample])
-            self.estimate_curve(clf)
 
         uncertain_id, uncertain_prob = self.uncertain(clf)
         certain_id, certain_prob = self.certain(clf)
@@ -278,7 +269,9 @@ class MAR(object):
         else:
             return uncertain_id, uncertain_prob, certain_id, certain_prob
 
-
+    def loc_sort(self):
+        loc=self.csr_mat[self.pool,10]
+        return self.pool[np.argsort(loc)[::-1][:self.step]]
 
     ## Train_kept model ##
     def train_kept(self):
