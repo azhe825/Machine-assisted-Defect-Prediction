@@ -34,18 +34,7 @@ class MAR(object):
         self.last_pos=0
         self.last_neg=0
 
-
-        try:
-            ## if model already exists, load it ##
-            return self.load()
-        except:
-            ## otherwise read from file ##
-            try:
-                self.loadfile()
-                self.save()
-            except:
-                ## cannot find file in workspace ##
-                self.flag=False
+        self.loadfile()
         return self
 
     ### Use previous knowledge, labeled only
@@ -68,27 +57,32 @@ class MAR(object):
             content = [x for x in csv.reader(csvfile, delimiter=',')]
 
         self.header = content[0]
+        loc_i = self.header.index('loc')
         self.body["body"]=content[1:]
-        self.body["time"] = [0]*(len(content) - 1)
-        self.body["code"]=['undetermined']*(len(content) - 1)
-        self.csr_mat=np.array(self.body["body"])[:,3:-1].astype(float)
-        self.body["label"]=['no' if x[-1]=='0' else 'yes' for x in self.body["body"]]
+        self.body["loc"] = [int(x[loc_i]) for x in self.body["body"] if int(x[loc_i])>0]
+        self.body["time"] = [0]*len(self.body["loc"])
+        self.body["code"]=[-1]*len(self.body["loc"])
+        tmp = range(3,loc_i)+range(loc_i+1,len(self.header)-1)
+        self.csr_mat=np.array([np.array(x)[tmp].astype(float)/int(x[loc_i]) for x in self.body["body"] if int(x[loc_i])>0])
+
+        self.body["label"]=[float(x[-1])/int(x[loc_i]) for x in self.body["body"] if int(x[loc_i])>0]
+
         return
 
     def get_numbers(self):
-        total = len(self.body["code"]) - self.last_pos - self.last_neg
-        pos = Counter(self.body["code"])["yes"] - self.last_pos
-        neg = Counter(self.body["code"])["no"] - self.last_neg
+        self.pool = np.where(np.array(self.body['code']) == -1)[0]
+        self.labeled = list(set(range(len(self.body['code']))) - set(self.pool))
+        total = sum(self.body['loc'])
+        found = sum([self.body['code'][x]*self.body['loc'][x] for x in self.labeled])
+        cost = sum(np.array(self.body['loc'])[self.labeled])
         try:
             tmp=self.record['x'][-1]
         except:
             tmp=-1
-        if int(pos+neg)>tmp:
-            self.record['x'].append(int(pos+neg))
-            self.record['pos'].append(int(pos))
-        self.pool = np.where(np.array(self.body['code']) == "undetermined")[0]
-        self.labeled = list(set(range(len(self.body['code']))) - set(self.pool))
-        return pos, neg, total
+        if cost>tmp:
+            self.record['x'].append(cost)
+            self.record['pos'].append(found)
+        return found, cost, total
 
     def export(self):
         fields = ["Document Title", "Abstract", "Year", "PDF Link", "label", "code","time"]
@@ -148,9 +142,9 @@ class MAR(object):
 
         if cl.split('-')[0]=='SVM':
             clf = svm.SVC(kernel=cl.split('-')[1], probability=True)
-        elif cl=="CART":
-            from sklearn import tree
-            clf = tree.DecisionTreeClassifier()
+        elif cl=="linear":
+            from sklearn.linear_model import LinearRegression
+            clf = LinearRegression()
         elif cl=="RF":
             from sklearn.ensemble import RandomForestClassifier
             clf = RandomForestClassifier()
@@ -163,35 +157,14 @@ class MAR(object):
         else:
             return [],[],self.random(),[]
 
-        poses = np.where(np.array(self.body['code']) == "yes")[0]
-        negs = np.where(np.array(self.body['code']) == "no")[0]
-        left = poses
-        decayed = list(left) + list(negs)
-        if not pne:
-            unlabeled=[]
-        else:
-            unlabeled = np.where(np.array(self.body['code']) == "undetermined")[0]
-            try:
-                unlabeled = np.random.choice(unlabeled,size=np.max((len(decayed),self.atleast)),replace=False)
-            except:
-                pass
 
 
-        labels=np.array([x if x!='undetermined' else 'no' for x in self.body['code']])
-        all_neg=list(negs)+list(unlabeled)
-        all = list(decayed)+list(unlabeled)
-        clf.fit(self.csr_mat[all], labels[all])
-        ## aggressive undersampling ##
-        if len(poses)>=self.enough and len(negs)>5*len(poses):
-            pos_at = list(clf.classes_).index('yes')
-            train_prob = clf.predict_proba(self.csr_mat[all_neg])[:,pos_at]
-            negs_sel = np.argsort(train_prob)[:len(left)]
-            sample = list(left) + list(np.array(all_neg)[negs_sel])
-            clf.fit(self.csr_mat[sample], labels[sample])
+        labels = np.array(self.body['label'])
+        clf.fit(self.csr_mat[self.labeled], labels[self.labeled])
 
-        uncertain_id, uncertain_prob = self.uncertain(clf)
+
         certain_id, certain_prob = self.certain(clf)
-        return uncertain_id, uncertain_prob, certain_id, certain_prob
+        return certain_id, certain_prob
 
     ## reuse
     def train_reuse(self):
@@ -270,8 +243,7 @@ class MAR(object):
             return uncertain_id, uncertain_prob, certain_id, certain_prob
 
     def loc_sort(self):
-        loc=self.csr_mat[self.pool,10]
-        return self.pool[np.argsort(loc)[::-1][:self.step]]
+        return self.pool[np.argsort(np.array(self.body['loc'])[self.pool])[:self.step]]
 
     ## Train_kept model ##
     def train_kept(self):
@@ -352,19 +324,10 @@ class MAR(object):
 
     ## Get certain ##
     def certain(self,clf):
-        pos_at = list(clf.classes_).index("yes")
-        prob = clf.predict_proba(self.csr_mat[self.pool])[:,pos_at]
+        prob = clf.predict(self.csr_mat[self.pool])
         order = np.argsort(prob)[::-1][:self.step]
         return np.array(self.pool)[order],np.array(prob)[order]
 
-    ## Get uncertain ##
-    def uncertain(self,clf):
-        pos_at = list(clf.classes_).index("yes")
-        prob = clf.predict_proba(self.csr_mat[self.pool])[:, pos_at]
-        # train_dist = clf.decision_function(self.csr_mat[self.pool])
-        # order = np.argsort(np.abs(train_dist))[:self.step]  ## uncertainty sampling by distance to decision plane
-        order = np.argsort(np.abs(prob-0.5))[:self.step]    ## uncertainty sampling by prediction probability
-        return np.array(self.pool)[order], np.array(prob)[order]
 
     ## Get random ##
     def random(self):
@@ -400,16 +363,7 @@ class MAR(object):
 
         fig = plt.figure()
         plt.plot(self.record['x'], self.record["pos"])
-        ### estimation ####
-        if len(self.est_num)>0 and self.lastprob>self.offset:
-            der = (self.record["pos"][-1]-self.record["pos"][-1-self.interval])/(self.record["x"][-1]-self.record["x"][-1-self.interval])
-            xx=np.array(range(len(self.est_num)+1))
-            yy=map(int,np.array(self.est_num)*der/(self.lastprob-self.offset)+self.record["pos"][-1])
-            # yy = map(int, np.array(self.est_num) + (der - self.lastprob)*xx[1:]*self.step + self.record["pos"][-1])
-            yy=[self.record["pos"][-1]]+list(yy)
-            xx=xx*self.step+self.record["x"][-1]
-            plt.plot(xx, yy, "-.")
-        ####################
+
         plt.ylabel("Relevant Found")
         plt.xlabel("Documents Reviewed")
         name=self.name+ "_" + str(int(time.time()))+".png"
@@ -422,8 +376,8 @@ class MAR(object):
         plt.close(fig)
         return name
 
-    def get_allpos(self):
-        return len([1 for c in self.body["label"] if c=="yes"])-self.last_pos
+    def get_allbugs(self):
+        return sum([self.body['label'][x]*self.body['loc'][x] for x in xrange(len(self.body['loc']))])
 
     ## Restart ##
     def restart(self):

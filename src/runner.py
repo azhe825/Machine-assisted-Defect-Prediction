@@ -727,24 +727,32 @@ def transfer(first,second):
         pickle.dump(result,handle)
 
 
-def START(filename,cl="RF"):
+def START(filename,cl="linear"):
     stop=1
+    thres=40
+    # thres=10000000000
 
     read = MAR()
     read = read.create(filename)
-    target = int(read.get_allpos()*stop)
+    target = int(read.get_allbugs()*stop)
     while True:
-        pos, neg, total = read.get_numbers()
-        print("%d, %d" %(pos,pos+neg))
-        if pos >= target:
+        found, cost, total = read.get_numbers()
+        try:
+            print("%d, %d" % (found, cost))
+        except:
+            pass
+        if found >= target:
             break
-        if pos==0 or pos+neg<40:
-            for id in read.random():
+
+        if found==0 or cost<thres:
+            for id in read.loc_sort():
                 read.code(id, read.body["label"][id])
         else:
-            a,b,ids,c =read.train(cl=cl)
+            ids,c =read.train(cl=cl)
             for id in ids:
                 read.code(id, read.body["label"][id])
+    read.plot()
+    set_trace()
     return read
 
 def START_LOC(filename,cl="SVM-linear"):
